@@ -10,12 +10,13 @@ class WebIF {
     }
 
     public function add_component(Component $comp) {
+        $comp->webif = $this;
         $this->components[] = $comp;
     }
 
     public function run() {
         foreach($this->components as $key => $comp) {
-            $evio = $this->loop->io($comp->sock , Ev::READ , array($comp, "onEvents"), $this);
+            $evio = $this->loop->io($comp->sock , Ev::READ , array("CWeb", "self::onEvents"), $comp);
             $evio->start();
         }
         $this->loop->run();

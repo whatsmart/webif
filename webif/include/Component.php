@@ -39,19 +39,29 @@ class Client {
 
     public static function onEvents($watcher, $revents) {
         $client = $watcher->data;
-//        if($revents & Ev::READ) {
-//            echo "data come\n";
-            $data = "";
-            $tmp = socket_read($client->sock, 1024);
-            echo $tmp;
-            if ($tmp === false)
+        if($revents & Ev::READ) {
+            $tmp = socket_read($client->sock, 1024, PHP_BINARY_READ);
+            //有时返回空字符串
+            if ($tmp == false) {
                 socket_close($client->sock);
-//        }
+                $watcher->stop();
+                return;
+            }
+            $data = $tmp;
+
+            while($tmp = socket_read($client->sock, 1024, PHP_BINARY_READ)) {
+                $data .= $ttt;
+            }
+
+            $client->parser->parse($data);
+        }
     }
 }
 
 class CWeb extends Component {
     public $clients;
+    public $sock;
+    public $webif;
 
     public function __construct() {
         $this->name = "web";
@@ -60,7 +70,9 @@ class CWeb extends Component {
         if(($this->sock = socket_create(AF_INET, SOCK_STREAM, SOL_TCP)) === false) {
             exit("fail to create socket\n");
         }
-        if(socket_bind($this->sock, "127.0.0.1", 80) === false) {
+        socket_set_option($this->sock, SOL_SOCKET, SO_REUSEADDR, 1);
+        socket_set_nonblock($this->sock);
+        if(socket_bind($this->sock, "localhost", 80) === false) {
             exit("fail to bind socket\n");
         }
         if(socket_listen($this->sock, 50) === false) {
@@ -72,19 +84,25 @@ class CWeb extends Component {
         socket_write($this->sock, $data);
     }
 
-    public function onEvents($watcher, $revents) {
-        $sock = socket_accept($this->sock);
-        echo "new client: $sock\n";
-
-        $webif = $watcher->data;
+    public static function onEvents($watcher, $revents) {
+        $cweb = $watcher->data;
+        $sock = socket_accept($cweb->sock);
+        if($sock === false)
+            return;
+//        echo "new client: $sock\n";
 
         $client = new Client();
         $client->sock = $sock;
-        $client->webif = $webif;
+        if(!socket_set_nonblock($client->sock)) {
+            echo "error setnonblock\n";
+        }
 
-        $this->clients[] = $client;
+        $webif = $cweb->webif;
+        $client->webif = $webif;
+        $cweb->clients[] = $client;
 
         $evio = $webif->loop->io($client->sock , Ev::READ , array("Client", "self::onEvents"), $client);
         $evio->start();
+        $webif->loop->run();
     }
 }

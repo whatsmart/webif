@@ -81,7 +81,6 @@ class HttpParser {
     
 
     public function parse($data) {
-        echo $data;
         $this->buffer .= $data;
         if($this->state == self::STATE_FIRST_LINE) {
             if(($p = strpos($this->buffer, "\r\n")) === false) {
