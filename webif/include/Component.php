@@ -35,6 +35,7 @@ class Client {
 
     public function __construct() {
         $this->parser = new HttpParser();
+        $this->parser->setFinishCallback(array($this, "handleMessage"), $this);
     }
 
     public static function onEvents($watcher, $revents) {
@@ -43,6 +44,7 @@ class Client {
             $tmp = socket_read($client->sock, 1024, PHP_BINARY_READ);
             //有时返回空字符串
             if ($tmp == false) {
+echo "remote closed\r\n";
                 socket_close($client->sock);
                 $watcher->stop();
                 return;
@@ -55,6 +57,18 @@ class Client {
 
             $client->parser->parse($data);
         }
+    }
+
+    public function handleMessage($message, $args) {
+        $resp = new HttpBuilder(HttpBuilder::RESPONSE);
+        $resp->setResponseLine("200", "OK");
+
+        $body = "hello\r\n";
+
+        $resp->setHeader("content-length", intval(strlen($body)));
+        $resp->setBody($body);
+
+        socket_write($this->sock, $resp->getMessage());
     }
 }
 
@@ -72,7 +86,7 @@ class CWeb extends Component {
         }
         socket_set_option($this->sock, SOL_SOCKET, SO_REUSEADDR, 1);
         socket_set_nonblock($this->sock);
-        if(socket_bind($this->sock, "localhost", 80) === false) {
+        if(socket_bind($this->sock, "0.0.0.0", 80) === false) {
             exit("fail to bind socket\n");
         }
         if(socket_listen($this->sock, 50) === false) {
