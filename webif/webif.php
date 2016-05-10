@@ -1,33 +1,43 @@
 <?php
-require_once("include/Component.php");
+define("WEBIF_ROOT", __DIR__);
+
+require_once("web/WebComponent.php");
+require_once("hub/HubComponent.php");
+require_once("include/EventLoop.php");
+
+function call() {
+
+}
 
 class WebIF {
-    private $components;
-    public $loop;
+    public $components;
+    public $evloop;
 
     public function __construct() {
-        $this->loop = new EvLoop();
+        $this->evloop = new EventLoop();
     }
 
-    public function add_component(Component $comp) {
-        $comp->webif = $this;
+    public function add_component($comp) {
         $this->components[] = $comp;
     }
 
     public function run() {
-        foreach($this->components as $key => $comp) {
-            $evio = $this->loop->io($comp->sock , Ev::READ , array("CWeb", "self::onEvents"), $comp);
-            $evio->start();
-        }
-        $this->loop->run();
+        $chub = new HubComponent($this);
+        $this->add_component($chub);
+
+        $listener = new IOListener($this->evloop, array($chub, "onEvents"), null, $chub->sock, EventLoop::READ);
+        $listener->enable();
+
+        $cweb = new WebComponent($this);
+        $this->add_component($cweb);
+
+        $listener = new IOListener($this->evloop, array($cweb, "onEvents"), null, $cweb->sock, EventLoop::READ);
+        $listener->enable();
+
+        $this->evloop->run();
     }
+
 }
 
 $webif = new WebIF();
-
-//$chub = new CHub();
-//$webif->add_component($chub);
-$cweb = new CWeb();
-$webif->add_component($cweb);
-
 $webif->run();

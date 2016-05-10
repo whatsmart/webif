@@ -1,90 +1,10 @@
 <?php
 
 class HttpMessage {
+    public $version;
     public $headers;
     public $body;
-
-    public function __construct() {
-        $this->headers = array();
-        $this->body = "";
-    }
-
-    public function setHeader($field, $value) {
-        $this->headers[$field] = $value;
-    }
-
-    public function getHeader($field) {
-        foreach($this->headers as $key => $value) {
-            if(!strcasecmp($key, $field)) {
-                return $value;
-            }
-        }
-
-        return null;
-    }
-
-    public function removeHeader($field) {
-        foreach($this->headers as $key => $value) {
-            if(!strcasecmp($key, $field)) {
-                unset($this->headers[$key]);
-            }
-        }
-    }
-
-    public function setBody($body) {
-        $this->body = $body;
-    }
-
-    public function getBody() {
-        return $this->body;
-    }
-}
-
-class RequestMessage extends HttpMessage {
-    public $method;
-    public $uri;
-    public $version;
-
-    public function __construct() {
-        $this->method = "";
-        $this->uri = "";
-        $this->version = "1.1";
-
-        parent::__construct();
-    }
-
-    public function setRequestLine($method, $uri, $version = "1.1") {
-        $this->method = $method;
-        $this->uri = $uri;
-        $this->version = $version;
-    }
-}
-
-class ResponseMessage extends HttpMessage {
-    public $version;
-    public $status;
-    public $reason;
-
-    public function __construct() {
-        $this->version = "1.1";
-        $this->status = null;
-        $this->reason = "";
-
-        parent::__construct();
-    }
-
-    public function setResponseLine($status, $reason, $version = "1.1") {
-        $this->status = $status;
-        $this->reason = $reason;
-        $this->version = $version;
-    }
-}
-
-class HttpBuilder {
-    const REQUEST   = 1;
-    const RESPONSE  = 2;
-
-    public $header_fields = array(
+    public static $header_fields = array(
                                   "general" => array("Cache-Control", "Connection", "Date", "Pragma", "Trailer", "Transfer-Encoding", "Upgrade", "Via", "Warning"),
 
                                   "request" => array("Accept", "Accept-Charset", "Accept-Encoding", "Accept-Language", "Authorization", "Expect",
@@ -98,119 +18,185 @@ class HttpBuilder {
                                                     "Content-MD5", "Content-Range", "Content-Type", "Expires", "Last-Modified"),
                                  );
 
-    public $fd;
-    public $message;
-
-    public function __construct($type = null, $realtime = false, $fd = null) {
-
-        if($realtime) {
-            if(is_resource($fd)) {
-                $this->fd = $fd;
-            } else {
-                throw Exception("invalid fd");
-            }
-            $this->message = null;
-        } else {
-            $this->fd = null;
-            if($type == self::REQUEST) {
-                $this->message = new RequestMessage();
-            } else if($type == self::RESPONSE){
-                $this->message = new ResponseMessage();
-            } else {
-                throw Exeption("message type error");
-            }
-        }
+    public function __construct($headers = [], $body = "", $version = "1.1") {
+        $this->headers = $headers;
+        $this->body = $body;
+        $this->version = $version;
     }
 
-    public function setRequestLine($method, $uri, $version = "1.1") {
-        if (is_a($this->message, "RequestMessage")) {
-            $this->message->setRequestLine($method, $uri, $version);
-        }
+    public function setVersion($version) {
+        $this->version = $version;
+        return $this;
     }
 
-    public function setResponseLine($status, $reason, $version = "1.1") {
-        if (is_a($this->message, "ResponseMessage")) {
-            $this->message->setResponseLine($status, $reason, $version);
-        }
+    public function getVersion() {
+        return $this->version;
     }
 
     public function setHeader($field, $value) {
-        $this->message->setHeader($field, $value);
+        $this->headers[$field] = $value;
+        return $this;
+    }
+
+    public function setHeaders($headers) {
+        $this->headers = $headers;
+        return $this;
+    }
+
+    public function getHeader($field) {
+        foreach($this->headers as $key => $value) {
+            if(!strcasecmp($key, $field)) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    public function getHeaders() {
+        return $this->headers;
     }
 
     public function removeHeader($field) {
-        $this->message->removeHeader($field);
+        foreach($this->headers as $key => $value) {
+            if(!strcasecmp($key, $field)) {
+                unset($this->headers[$key]);
+            }
+        }
     }
 
     public function setBody($body) {
-        $this->message->body = $body;
+        $this->body = $body;
+        return $this;
+    }
+
+    public function getBody() {
+        return $this->body;
+    }
+}
+
+class HttpRequest extends HttpMessage {
+    public $method;
+    public $uri;
+
+    public function __construct($method = "", $uri = "", $headers = [], $body = "", $version = "1.1") {
+        $this->method = $method;
+        $this->uri = $uri;
+
+        parent::__construct($headers, $body, $version);
+    }
+
+    public function setRequestLine($method, $uri, $version = "1.1") {
+        $this->method = $method;
+        $this->uri = $uri;
+        $this->version = $version;
+        return $this;
+    }
+
+    public function setMethod($method) {
+        $this->method = $method;
+        return $this;
+    }
+
+    public function getMethod() {
+        return $this->method;
+    }
+
+    public function setUri($uri) {
+        $this->uri = $uri;
+        return $this;
+    }
+
+    public function getUri() {
+        return $this->uri;
     }
 
     public function getMessage() {
         $msg = "";
-        if (is_a($this->message, "RequestMessage")) {
-            $msg .= $this->message->method . " " . $this->message->uri . " HTTP/" . $this->message->version . "\r\n";
-        } else if(is_a($this->message, "ResponseMessage")) {
-            $msg .= "HTTP/" . $this->message->version . " " . $this->message->status . " " .$this->message->reason . "\r\n";
-        }
+        $msg .= $this->method . " " . $this->uri . " HTTP/" . $this->version . "\r\n";
 
-        foreach($this->header_fields as $fields) {
+        $this->setHeader("Content-Length", strval(strlen($this->body)));
+
+        foreach(parent::$header_fields as $fields) {
             foreach($fields as $field) {
-                if(($value = $this->message->getHeader($field)) != null) {
+                if(($value = $this->getHeader($field)) != null) {
                     $msg .= $field . ": " . $value . "\r\n";
-                    $this->message->removeHeader($field);
+                    $this->removeHeader($field);
                 }
             }
         }
 
-        foreach($this->message->headers as $key => $value) {
+        foreach($this->headers as $key => $value) {
             $msg .= $key . ": " . $value . "\r\n";
         }
         $msg .= "\r\n";
-        $msg .= $this->message->body;
+        $msg .= $this->body;
 
         return $msg;
     }
+}
 
-    //below methods are for realtime transfer
-    public function sendRequestLine($method, $uri, $version = "1.1") {
-        socket_write($this->fd, $method . " " . $uri . " HTTP/" . $version . "\r\n");
+class HttpResponse extends HttpMessage {
+    public $status;
+    public $reason;
+
+    public function __construct($status = "", $reason = "", $headers = [], $body = "", $version = "1.1") {
+        $this->status = $status;
+        $this->reason = $reason;
+
+        parent::__construct($headers, $body, $version);
     }
 
-    public function sendResponseLine($status, $reason, $version = "1.1") {
-        socket_write($this->fd, "HTTP/" . $version . " " . $status . " " .$reason . "\r\n");
+    public function setResponseLine($status, $reason, $version = "1.1") {
+        $this->status = $status;
+        $this->reason = $reason;
+        $this->version = $version;
+        return $this;
     }
 
-    public function sendHeader($field, $value) {
-        socket_write($this->fd, $field . ": " . $value . "\r\n");
+    public function setStatus($status) {
+        $this->status = $status;
+        return $this;
     }
 
-    public function sendHeaderFinished() {
-        socket_write($this->fd, "\r\n");
+    public function getStatus() {
+        return $this->status;
     }
 
-    public function sendBody($body) {
-        socket_write($this->fd, $body);
+    public function setReason($reason) {
+        $this->reason = $reason;
+        return $this;
     }
 
-    public function sendChunk($data) {
-        $len = strval(strlen($data));
-        socket_write($this->fd, $len . "\r\n");
-        socket_write($this->fd, $data . "\r\n");
+    public function getReason() {
+        return $this->reason;
     }
 
-    public function sendChunkFinished() {
-        socket_write($this->fd, "0\r\n");
-    }
+    public function getMessage() {
+        $msg = "";
+        $msg .= "HTTP/" . $this->version . " " . $this->status . " " .$this->reason . "\r\n";
 
-    public function sendTrailer($field, $value) {
-        socket_write($this->fd, $field . ": " . $value . "\r\n");
-    }
+        $this->setHeader("Content-Length", strval(strlen($this->body)));
 
-    public function sendTrailerFinished() {
-        socket_write($this->fd, "\r\n");
+        foreach(parent::$header_fields as $fields) {
+            foreach($fields as $field) {
+                if(($value = $this->getHeader($field)) != null) {
+                    $msg .= $field . ": " . $value . "\r\n";
+                    $this->removeHeader($field);
+                }
+            }
+        }
+
+        foreach($this->headers as $key => $value) {
+            $msg .= $key . ": " . $value . "\r\n";
+        }
+        $msg .= "\r\n";
+        $msg .= $this->body;
+
+        return $msg;
     }
 }
+
 
 class HttpParser {
     const REQUEST_LINE_RE = "/([^ ]+) ([^ ]+) HTTP\\/(\\d+\\.\\d+)/";
@@ -292,7 +278,7 @@ class HttpParser {
 
             if(preg_match(self::REQUEST_LINE_RE, $line, $match)) {
                 if($this->isToken($match[1])) {
-                    $this->message = new RequestMessage();
+                    $this->message = new HttpRequest();
                     $this->message->version = $match[3];
                     $this->message->uri = $match[2];
                     $this->message->method = $match[1];
@@ -300,7 +286,7 @@ class HttpParser {
                     return self::FINISHED;
                 }
             } else if(preg_match(self::RESPONSE_LINE_RE, $line, $match)) {
-                $this->message = new ResponseMessage();
+                $this->message = new HttpResponse();
                 $this->message->version = $match[1];
                 $this->message->status = $match[2];
                 $this->message->reason = $match[3];
@@ -323,6 +309,7 @@ class HttpParser {
                 if($this->field_name) {
                     $this->message->headers[$this->field_name] = rtrim($this->field_value);
                     $this->field_name = "";
+                    $this->field_value = "";
                 }
 
                 return self::FINISHED;
@@ -332,6 +319,7 @@ class HttpParser {
                 if($this->field_name) {
                     $this->message->headers[$this->field_name] = rtrim($this->field_value);
                     $this->field_name = "";
+                    $this->field_value = "";
                 }
 
                 if(($c = strpos($line, ":")) != false) {
@@ -408,7 +396,7 @@ class HttpParser {
                     return self::FINISHED;
                 }
             } else {
-                //maybe not finished
+                //assume no body
                 return self::FINISHED;
             }
         }
@@ -443,26 +431,28 @@ class HttpParser {
         }
         if($this->state == self::STATE_FINISHED) {
             $tecs = $this->message->getHeader("transfer-encoding");
-            $tecs = explode(",", $tecs);
-            $tecs = array_reverse($tecs);
-            foreach($tecs as $ec) {
-                switch($ec) {
-                    case "chunked":
-                        break;
-                    case "identity":
-                        break;
-                    case "gzip":
-                        $this->message->body = gzdecode($this->message->body);
-                        break;
-                    case "compress":
-                        $this->message->body = gzuncompress($this->message->body);
-                        break;
-                    case "deflate":
-                        $this->message->body = gzinflate($this->message->body);
-                        break;
+            if($tecs) {
+                $tecs = explode(",", $tecs);
+                $tecs = array_reverse($tecs);
+                foreach($tecs as $ec) {
+                    switch($ec) {
+                        case "chunked":
+                            break;
+                        case "identity":
+                            break;
+                        case "gzip":
+                            $this->message->body = gzdecode($this->message->body);
+                            break;
+                        case "compress":
+                            $this->message->body = gzuncompress($this->message->body);
+                            break;
+                        case "deflate":
+                            $this->message->body = gzinflate($this->message->body);
+                            break;
+                    }
                 }
+                $this->message->removeHeader("transfer-encoding");
             }
-            $this->message->removeHeader("transfer-encoding");
 
             if($this->finish_callback) {
                 call_user_func($this->finish_callback, $this->message, $this->finish_args);
@@ -471,6 +461,8 @@ class HttpParser {
                 $buf = $this->buffer;
                 $this->reset();
                 $this->parse($buf);
+            } else {
+                $this->reset();
             }
         }
     }
