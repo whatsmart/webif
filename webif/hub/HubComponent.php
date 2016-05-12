@@ -8,8 +8,9 @@ class HubComponent {
     public $name;
     public $webif;    
 
-    public function __construct() {
+    public function __construct($webif) {
         $this->name = "hub";
+        $this->webif = $webif;
         $this->parser = new HipcParser();
         $this->parser->setFinishCallback(array($this, "handleMessage"), $this);
 
@@ -34,7 +35,6 @@ class HubComponent {
         $data = "";
         if($revents & EventLoop::READ) {
             $tmp = socket_read($this->sock, 1024, PHP_BINARY_READ);
-echo $tmp;
             //有时返回空字符串
             if ($tmp == false) {
 //              echo "remote closed\r\n";
@@ -42,10 +42,15 @@ echo $tmp;
                 $listener->destroy();
                 return;
             }
+            //while
+            $this->parser->parse($tmp);
         }
     }
 
     public function handleMessage($message, $client) {
-        var_dump($message);
+//var_dump($message);
+        if($message->getDest()) {
+            $this->webif->evloop->asyncCall($message->getDest(), $message->getBody());
+        }
     }
 }

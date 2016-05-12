@@ -4,16 +4,16 @@ require_once(WEBIF_ROOT . "/include/EventLoop.php");
 require_once(WEBIF_ROOT . "/web/Router.php");
 require_once(WEBIF_ROOT . "/web/webroot/index.php");
 
-class Client {
+class Connection {
     public $sock;
     public $parser;
     public $webif;
-    public $watcher;
-    public $conns;
+    public $reqs;
 
     public function __construct() {
         $this->parser = new HttpParser();
-        $this->parser->setFinishCallback(array($this, "handleMessage"), $this);
+        $this->parser->setFinishCallback(array($this, "handleMessage"), null);
+        $this->reqs = [];
     }
 
     public function onEvents($listener, $revents) {
@@ -38,12 +38,28 @@ class Client {
         }
     }
 
-    public function handleMessage($message, $client) {
+    public function finishRequest() {
+        array_shift($this->reqs);
+        if(count($this->reqs) > 0) {
+            $this->handleRequest($this->reqs[0]);
+        }
+    }
+
+    public function handleRequest() {
+        //http pipeline, if $this->reqs is empty, handle it, or add it to the array.
+//        if(!$this->reqs) {
+            if(!Router::dispatch($this->reqs[0], $this->reqs[0]->method, $this, $this->reqs[0]->path)) {
+                $resp = new HttpResponse("404", "Not Found", [], "not found");
+                socket_write($this->sock, $resp->getMessage());
+                array_shift($this->reqs);
+            }
+//        }
+    }
+
+    public function handleMessage($message, $args) {
         if(is_a($message, "HttpRequest")) {
-            //需要实现http pipeline, $this->conns保存请求信息
             $path = parse_url($message->uri)["path"];
             $file = WEBIF_ROOT . "/web/webroot" . $path;
-    //        echo $file . PHP_EOL;
             if(is_file($file)){
                 $mime = mime_content_type($file);
                 $fp = fopen($file, "r");
@@ -52,10 +68,9 @@ class Client {
                 $resp = new HttpResponse("200", "OK", ["Content-Type" => $mime], $contents);
                 socket_write($this->sock, $resp->getMessage());
             } else {
-                if(!Router::dispatch($message, $client, $message->getMethod(), $path)) {
-                    $resp = new HttpResponse("404", "Not Found", [], "not found");
-                    socket_write($this->sock, $resp->getMessage());
-                }
+                $req = new Request($message);
+                $this->reqs[] = $req;
+                $this->handleRequest();
             }
         }
     }

@@ -124,7 +124,7 @@ class HipcParser {
     const FINISHED          = 2;
 
     const REQUEST_LINE_RE = "/HIPC\\/(\\d+\\.\\d+) +request +(.*)/";
-    const RESPONSE_LINE_RE = "/HIPC\\/(\\d+\\.\\d+) +response( +.*|)/";
+    const RESPONSE_LINE_RE = "/HIPC\\/(\\d+\\.\\d+) +response(( +(.*))|())?/";
 
     private $state;
     private $message;
@@ -169,7 +169,7 @@ class HipcParser {
             } else if(preg_match(self::RESPONSE_LINE_RE, $line, $match)) {
                 $this->message = new HipcResponse();
                 $this->message->version = $match[1];
-                $this->message->dest = $match[2];
+                $this->message->dest = $match[4];
 
                 return self::FINISHED;
             }
@@ -244,6 +244,8 @@ class HipcParser {
                 $buf = $this->buffer;
                 $this->reset();
                 $this->parse($buf);
+            } else {
+                $this->reset();
             }
         }
     }

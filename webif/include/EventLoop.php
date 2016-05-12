@@ -32,9 +32,7 @@ class IOListener extends EvListener {
 
     public function __construct($loop, $callback, $data, $fd, $flags) {
         parent::__construct($loop, $callback, $data);
-//var_dump($fd);
         $this->fd = $fd;
-//var_dump($this->fd);
         $this->flags = $flags;
 
         $this->loop->iolisteners[] = $this;
@@ -50,6 +48,7 @@ class EventLoop {
     public $stop;
 
     public $iolisteners;
+    public $callbacks;
 
     public function __construct() {
         $this->reads = [];
@@ -66,11 +65,29 @@ class EventLoop {
         }
     }
 
+    public function time() {
+        return time();
+    }
+
+    public function asyncRun($id, $timeout, $callback){
+
+        $this->callbacks[] = array("id" => $id, "callback" => $callback, "start" => $this->time(), "timeout" => $timeout);
+    }
+
+    public function asyncCall($id, $args) {
+        foreach($this->callbacks as $cb) {
+            if($cb["id"] == $id) {
+                $cb["callback"]($args);
+            }
+        }
+    }
+
     public function run() {
         $this->stop = false;
 
         while (!$this->stop) {
 //echo "loop";
+            //io pool
             $reads = [];
             $writes = [];
             $excepts = [];
@@ -100,6 +117,15 @@ class EventLoop {
                     }
                 }
             }
+
+            //async
+/*
+            foreach($this->generators as $gen) {
+                if (time() >= $gen["start"] + $gen["timeout"]) {
+                    unset($gen);
+                }
+            }
+*/
         }
     }
 }

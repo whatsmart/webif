@@ -1,8 +1,8 @@
 <?php
-require_once(WEBIF_ROOT . "/web/Client.php");
+require_once(WEBIF_ROOT . "/web/Connection.php");
 
 class WebComponent {
-    public $clients;
+    public $connections;
     public $webif;
     public $sock;
     public $name;
@@ -10,7 +10,7 @@ class WebComponent {
     public function __construct($webif) {
         $this->name = "web";
         $this->sock = null;
-        $this->clients = [];
+        $this->connections = [];
         $this->webif = $webif;
 
         if(($this->sock = socket_create(AF_INET, SOCK_STREAM, SOL_TCP)) === false) {
@@ -36,18 +36,18 @@ class WebComponent {
         $sock = socket_accept($this->sock);
         if($sock === false)
             return;
-        echo "new client: $sock\n";
+        echo "new connection: $sock\n";
 
-        $client = new Client();
-        $client->sock = $sock;
-        if(!socket_set_nonblock($client->sock)) {
+        $connection = new Connection();
+        $connection->sock = $sock;
+        if(!socket_set_nonblock($connection->sock)) {
             echo "error setnonblock\n";
         }
 
-        $client->webif = $this->webif;
-        $this->clients[] = $client;
+        $connection->webif = $this->webif;
+        $this->connections[] = $connection;
 
-        $listener = new IOListener($this->webif->evloop, array($client, "onEvents"), $client, $client->sock, EventLoop::READ);
+        $listener = new IOListener($this->webif->evloop, array($connection, "onEvents"), null, $connection->sock, EventLoop::READ);
         $listener->enable();
     }
 }
