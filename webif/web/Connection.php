@@ -41,19 +41,16 @@ class Connection {
     public function finishRequest() {
         array_shift($this->reqs);
         if(count($this->reqs) > 0) {
-            $this->handleRequest($this->reqs[0]);
+            $this->handleRequest();
         }
     }
 
     public function handleRequest() {
-        //http pipeline, if $this->reqs is empty, handle it, or add it to the array.
-//        if(!$this->reqs) {
-            if(!Router::dispatch($this->reqs[0], $this->reqs[0]->method, $this, $this->reqs[0]->path)) {
-                $resp = new HttpResponse("404", "Not Found", [], "not found");
-                socket_write($this->sock, $resp->getMessage());
-                array_shift($this->reqs);
-            }
-//        }
+        if(!Router::dispatch($this->reqs[0], $this->reqs[0]->method, $this, $this->reqs[0]->path)) {
+            $resp = new HttpResponse("404", "Not Found", [], "not found");
+            socket_write($this->sock, $resp->getMessage());
+            array_shift($this->reqs);
+        }
     }
 
     public function handleMessage($message, $args) {
@@ -70,7 +67,11 @@ class Connection {
             } else {
                 $req = new Request($message);
                 $this->reqs[] = $req;
-                $this->handleRequest();
+                //http pipeline，先将请求添加到队列中，如果队列中只有一个请求则立即执行，否则不执行。
+                //当正在执行的请求处理完成后，会依次执行后面的请求。
+                if(count($this->reqs) == 1) {
+                    $this->handleRequest();
+                }
             }
         }
     }
