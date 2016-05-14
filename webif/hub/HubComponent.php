@@ -17,7 +17,9 @@ class HubComponent {
         if(($this->sock = socket_create(AF_UNIX, SOCK_STREAM, 0)) === false) {
             exit("fail to create socket\n");
         }
-
+        if(!socket_set_nonblock($this->sock)) {
+            echo "error setnonblock\n";
+        }
         if(socket_connect($this->sock, "/tmp/hub_sock") === false) {
             exit("fail to connect socket\n");
         }
@@ -41,9 +43,16 @@ class HubComponent {
                 socket_close($this->sock);
                 $listener->destroy();
                 return;
+            } else {
+                $data = $tmp;
+                while($tmp = socket_read($this->sock, 1024, PHP_BINARY_READ)) {
+                    $data .= $tmp;
+                }
+                $this->parser->parse($data);
             }
-            //while
-            $this->parser->parse($tmp);
+        }
+        if($revents & EventLoop::WRITE) {
+            //@todo write async
         }
     }
 

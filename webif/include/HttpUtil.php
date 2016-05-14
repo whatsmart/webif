@@ -17,6 +17,7 @@ class Request {
     public function __construct($message) {
         $this->method = $message->getMethod();
         $this->path = parse_url($message->uri)["path"];
+        $this->method = $message->getMethod();
         $this->body = $message->getBody();
     }
 }

@@ -28,26 +28,24 @@ class WebComponent {
 //var_dump($this->sock);
     }
 
-    public function write($data) {
-        socket_write($this->sock, $data);
-    }
-
     public function onEvents($listener, $revents) {
-        $sock = socket_accept($this->sock);
-        if($sock === false)
-            return;
-        echo "new connection: $sock\n";
+        if($revents & EventLoop::READ) {
+            $sock = socket_accept($this->sock);
+            if($sock === false)
+                return;
+            echo "new connection: $sock\n";
 
-        $connection = new Connection();
-        $connection->sock = $sock;
-        if(!socket_set_nonblock($connection->sock)) {
-            echo "error setnonblock\n";
+            $connection = new Connection();
+            $connection->sock = $sock;
+            if(!socket_set_nonblock($connection->sock)) {
+                echo "error setnonblock\n";
+            }
+
+            $connection->webif = $this->webif;
+            $this->connections[] = $connection;
+
+            $listener = new IOListener($this->webif->evloop, array($connection, "onEvents"), null, $connection->sock, EventLoop::READ);
+            $listener->enable();
         }
-
-        $connection->webif = $this->webif;
-        $this->connections[] = $connection;
-
-        $listener = new IOListener($this->webif->evloop, array($connection, "onEvents"), null, $connection->sock, EventLoop::READ);
-        $listener->enable();
     }
 }

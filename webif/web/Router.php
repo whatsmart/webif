@@ -23,32 +23,50 @@ class Router {
         self::$routes[$path]["callback"] = $callback;
     }
 
-    public function dispatch($req, $method, $connection, $path) {
-        $len = 0;
+    public function dispatch($req, $connection, $path) {
+        $method = $req->method;
         $r = null;
+        $path = preg_replace("/\\/+/", "/", $path);
+        $ps = explode("/", $path);
+        array_shift($ps);
+
         foreach(self::$routes as $key => $value) {
-            if(preg_match("/" . $key . "/", $path, $match)) {
-                if(strlen($match[0]) > $len) {
-                    $len = strlen($match[0]);
-                    $r = $key;
+            $pts = explode("\\/", $key);
+            array_shift($pts);
+            if(count($ps) == count($pts)) {
+                $c = count($pts);
+                for($i=0; $i<$c-1; $i++) {
+                    if(!preg_match("/" . $pts[$i] . "/", $ps[$i])) {
+                        break;
+                    }
+                }
+                if($i == $c - 1) {
+                    if($pts[$c-1] != ""){
+                        if(preg_match("/".$pts[$c-1]."/", $ps[$c-1])) {
+                            $r = $key;
+                        }
+                    } else if($pts[$c-1] == "") {
+                        if($ps[$c-1] == "") {
+                            $r = $key;
+                        }
+                    }
                 }
             }
         }
 
         if($r != null) {
-            preg_match("/" . $r . "/", $path);
             $callback = self::$routes[$r]["callback"];
 
             if($ms = self::$routes[$r]["methods"]) {
                 foreach($ms as $m) {
                     if(!strcasecmp($m, $method)) {
-                        $callback($req, $method, $connection);
+                        $callback($req, $connection);
                         return true;
                     }
                 }
                 return false;
             } else {
-                $callback($req, $method, $connection);
+                $callback($req, $connection);
                 return true;
             }
         }

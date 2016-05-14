@@ -36,6 +36,9 @@ class Connection {
                 $this->parser->parse($data);
             }
         }
+        if($revents & EventLoop::WRITE) {
+            //@todo write async
+        }
     }
 
     public function finishRequest() {
@@ -46,7 +49,7 @@ class Connection {
     }
 
     public function handleRequest() {
-        if(!Router::dispatch($this->reqs[0], $this->reqs[0]->method, $this, $this->reqs[0]->path)) {
+        if(!Router::dispatch($this->reqs[0], $this, $this->reqs[0]->path)) {
             $resp = new HttpResponse("404", "Not Found", [], "not found");
             socket_write($this->sock, $resp->getMessage());
             array_shift($this->reqs);
@@ -57,6 +60,7 @@ class Connection {
         if(is_a($message, "HttpRequest")) {
             $path = parse_url($message->uri)["path"];
             $file = WEBIF_ROOT . "/web/webroot" . $path;
+            //echo $file. PHP_EOL;
             if(is_file($file)){
                 $mime = mime_content_type($file);
                 $fp = fopen($file, "r");

@@ -55,6 +55,7 @@ class EventLoop {
         $this->writes = [];
         $this->stop = false;
         $this->iolisteners = [];
+        $this->callbacks = [];
     }
 
     public function destroyIOListener($listener) {
@@ -69,9 +70,8 @@ class EventLoop {
         return time();
     }
 
-    public function asyncRun($id, $timeout, $callback){
-
-        $this->callbacks[] = array("id" => $id, "callback" => $callback, "start" => $this->time(), "timeout" => $timeout);
+    public function asyncRun($id, $callback, $timeout, $timeoutcallback = null){
+        $this->callbacks[] = array("id" => $id, "callback" => $callback, "start" => $this->time(), "timeout" => $timeout, "tocallback" => $timeoutcallback);
     }
 
     public function asyncCall($id, $args) {
@@ -118,14 +118,17 @@ class EventLoop {
                 }
             }
 
-            //async
-/*
-            foreach($this->generators as $gen) {
-                if (time() >= $gen["start"] + $gen["timeout"]) {
-                    unset($gen);
+            //asyncRun timeout
+            $time = $this->time();
+            foreach($this->callbacks as $key => $cb) {
+                if ($time >= $cb["start"] + $cb["timeout"]) {
+                    if($cb["tocallback"]) {
+                        $cb["tocallback"]();
+                    }
+                    unset($this->callbacks[$key]);
                 }
             }
-*/
+
         }
     }
 }

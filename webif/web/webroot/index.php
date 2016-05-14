@@ -4,11 +4,8 @@ require_once(WEBIF_ROOT . "/include/Hipc.php");
 require_once(WEBIF_ROOT . "/web/Router.php");
 require_once(WEBIF_ROOT . "/include/HttpUtil.php");
 
-require_once(WEBIF_ROOT . "/web/webroot/jsonrpc.php");
-
-/*
-* response must write finished in one time, because there is no lock for $sock.
-*/
+require_once(WEBIF_ROOT . "/web/webroot/jsonrpc/v1.0/device.php");
+require_once(WEBIF_ROOT . "/web/webroot/jsonrpc/v1.0/control.php");
 
 $router = new Router();
 
@@ -20,29 +17,8 @@ function getHub($webif) {
     }
 }
 
-$router->route("/device", function($message, $method, $conn) {
-    $hub = getHub($conn->webif);
-    $req = new HipcRequest("device", $message->body, ["origin" => spl_object_hash($message)]);
-    socket_write($hub->sock, $req->getMessage());
-
-    $func = function ($args) use ($message, $method, $conn) {
-        $resp = new HttpResponse("200", "OK", [], $args);
-        socket_write($conn->sock, $resp->getMessage());
-        $conn->finishRequest();
-    };
-
-    $loop = $conn->webif->evloop;
-    $loop->asyncRun(spl_object_hash($message), 20, $func);
+$router->route("/", function($req, $conn) {
+    $resp = new HttpResponse("200", "OK", [], "hello world");
+    socket_write($conn->sock, $resp->getMessage());
+    $conn->finishRequest();
 });
-
-
-
-
-/*
-//$message, $client
-
-require_once(WEBIF_ROOT . "/include/Http.php");
-//var_dump($client);
-
-
-*/
