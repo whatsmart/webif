@@ -59,7 +59,7 @@ class HubComponent {
     public function handleMessage($message, $client) {
 //var_dump($message);
         if($message->getDest()) {
-            $this->webif->evloop->asyncCall($message->getDest(), $message->getBody());
+            $this->webif->evloop->asyncSend($message->getDest(), $message->getBody());
         }
     }
 }

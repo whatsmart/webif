@@ -55,7 +55,7 @@ class EventLoop {
         $this->writes = [];
         $this->stop = false;
         $this->iolisteners = [];
-        $this->callbacks = [];
+        $this->generators = [];
     }
 
     public function destroyIOListener($listener) {
@@ -70,14 +70,18 @@ class EventLoop {
         return time();
     }
 
-    public function asyncRun($id, $callback, $timeout, $timeoutcallback = null){
-        $this->callbacks[] = array("id" => $id, "callback" => $callback, "start" => $this->time(), "timeout" => $timeout, "tocallback" => $timeoutcallback);
+    public function asyncRun($id, $gen, $timeout, $timeoutcallback = null){
+        $this->generators[] = array("id" => $id, "gen" => $gen, "start" => $this->time(), "timeout" => $timeout, "tocallback" => $timeoutcallback);
+        $gen->rewind();
     }
 
-    public function asyncCall($id, $args) {
-        foreach($this->callbacks as $cb) {
-            if($cb["id"] == $id) {
-                $cb["callback"]($args);
+    public function asyncSend($id, $data) {
+        foreach($this->generators as $key => $gen) {
+            if($gen["id"] == $id) {
+                $gen["gen"]->send($data);
+                if(!$gen["gen"]->valid()) {
+                    unset($this->generators[$key]);
+                }
             }
         }
     }
@@ -120,12 +124,12 @@ class EventLoop {
 
             //asyncRun timeout
             $time = $this->time();
-            foreach($this->callbacks as $key => $cb) {
-                if ($time >= $cb["start"] + $cb["timeout"]) {
-                    if($cb["tocallback"]) {
-                        $cb["tocallback"]();
+            foreach($this->generators as $key => $gen) {
+                if ($time >= $gen["start"] + $gen["timeout"]) {
+                    if($gen["tocallback"]) {
+                        $gen["tocallback"]();
                     }
-                    unset($this->callbacks[$key]);
+                    unset($this->generators[$key]);
                 }
             }
 

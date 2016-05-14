@@ -6,6 +6,8 @@ require_once(WEBIF_ROOT . "/include/HttpUtil.php");
 
 require_once(WEBIF_ROOT . "/web/webroot/jsonrpc/v1.0/device.php");
 require_once(WEBIF_ROOT . "/web/webroot/jsonrpc/v1.0/control.php");
+require_once(WEBIF_ROOT . "/web/webroot/jsonrpc/v1.0/message.php");
+require_once(WEBIF_ROOT . "/web/webroot/jsonrpc/v1.0/user.php");
 
 $router = new Router();
 

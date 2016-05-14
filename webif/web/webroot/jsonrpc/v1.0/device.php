@@ -17,35 +17,22 @@ $router->route("/device", function($req, $conn) {
     if($req->method == "POST") {
         $rpc = new JsonRPC\RequestDecoder();
         if(!$rpc->decode($req->body)) {
-
             $resp = new HttpResponse("400", "Bad Request", ["Cache-Control" => "no-cache"], "");
             socket_write($conn->sock, $resp->getMessage());
             $conn->finishRequest();
-
         } else {
-            switch($rpc->method) {
-                case "get_devices":
-                    $ipcReq = new HipcRequest("device", $req->body, ["origin" => $id]);
-                    socket_write($hub->sock, $ipcReq->getMessage());
+            $ipcReq = new HipcRequest("device", $req->body, ["origin" => $id]);
+            socket_write($hub->sock, $ipcReq->getMessage());
 
-                    $func = function ($args) use ($req, $conn) {
-                        $resp = new HttpResponse("200", "OK", ["Cache-Control" => "no-cache", "Content-Type" => "application/json"], $args);
-//echo $resp->getMessage();
-                        socket_write($conn->sock, $resp->getMessage());
-                        $conn->finishRequest();
-                    };
-
-                    $loop = $conn->webif->evloop;
-                    $loop->asyncRun($id, $func, 20);
-                    break;
-                default:
-                    $rb = JsonRPC\ErrorEncoder::encode(1, "unsupported rpc method", null, $rpc->id);
-                    $resp = new HttpResponse("200", "OK", ["Cache-Control" => "no-cache", "Content-Type" => "application/json"], $rb);
-//echo $resp->getMessage();
-                    socket_write($conn->sock, $resp->getMessage());
-                    $conn->finishRequest();
-            }
-
+            $func = function () use ($req, $conn) {
+                $data = yield;
+                $resp = new HttpResponse("200", "OK", ["Cache-Control" => "no-cache", "Content-Type" => "application/json"], $data);
+                socket_write($conn->sock, $resp->getMessage());
+                $conn->finishRequest();
+            };
+            $gen = $func();
+            $loop = $conn->webif->evloop;
+            $loop->asyncRun($id, $gen, 5);
         }
     } else {
         $resp = new HttpResponse("405", "Method Not Allowed", ["Cache-Control" => "no-cache", "Allow" => "POST"], "");
@@ -64,40 +51,33 @@ $router->route("/device/<int>", function($req, $conn) {
     preg_match("/\\/device\\/(\d+)/", $req->path, $match);
     $did = $match[1];
 
+    //检查是否为POST方法
     if($req->method == "POST") {
         $rpc = new JsonRPC\RequestDecoder();
+        //检查是否为合法的JsonRPC请求，若不合法，返回Bad Request
         if(!$rpc->decode($req->body)) {
-
             $resp = new HttpResponse("400", "Bad Request", ["Cache-Control" => "no-cache"], "");
             socket_write($conn->sock, $resp->getMessage());
             $conn->finishRequest();
-
         } else {
+            //若为合法的JsonRPC请求，将其直接转发给hub
+            $ipcReq = new HipcRequest("device/". $did, $req->body, ["origin" => $id]);
+            socket_write($hub->sock, $ipcReq->getMessage());
 
-            if(in_array($rpc->method, ["get_name", "set_name", "get_position", "set_position"])) {
-                $ipcReq = new HipcRequest("device/". $did, $req->body, ["origin" => $id]);
-                socket_write($hub->sock, $ipcReq->getMessage());
-
-                $func = function ($args) use ($req, $conn) {
-                    $resp = new HttpResponse("200", "OK", ["Cache-Control" => "no-cache", "Content-Type" => "application/json"], $args);
-
-                    socket_write($conn->sock, $resp->getMessage());
-                    $conn->finishRequest();
-                };
-
-                $loop = $conn->webif->evloop;
-                $loop->asyncRun($id, $func, 20);
-            } else {
-                $ipcResp = JsonRPC\ErrorEncoder::encode(1, "unsupported rpc method", null, $rpc->id);
-                $resp = new HttpResponse("200", "OK", ["Cache-Control" => "no-cache", "Content-Type" => "application/json"], $ipcResp);
+            $func = function () use ($req, $conn) {
+                $data = yield;
+                $resp = new HttpResponse("200", "OK", ["Cache-Control" => "no-cache", "Content-Type" => "application/json"], $data);
 
                 socket_write($conn->sock, $resp->getMessage());
                 $conn->finishRequest();
-            }
-
+            };
+            $gen = $func();
+            $loop = $conn->webif->evloop;
+            $loop->asyncRun($id, $gen, 5);
         }
     } else {
-        $resp = new HttpResponse("405", "Method Not Allowed", ["Cache-Control" => "no-cache", "Allow" => "POST"], "");
+        //若不是POST方法，返回Method Not Allowed
+        $resp = new HttpResponse("405", "Method Not Allowed", ["Allow" => "POST"], "");
         socket_write($conn->sock, $resp->getMessage());
         $conn->finishRequest();
     }
